@@ -1,0 +1,29 @@
+{
+	"version": "1.0.0",
+	"api": {
+		"active": false,
+		"auth": {
+			"clientId": "exampleClientID",
+			"clientSecret": "exampleClientSecret",
+			"applicationId": "exampleApplicationID",
+			"refreshToken": "exampleRefreshToken"
+		},
+		"baseUrl": "https://sellingpartnerapi-na.amazon.com",
+		"tokenUrl": "https://api.amazon.com/auth/o2/token",
+		"endpointUrl": "/vendor/orders/v1/purchaseOrders"
+	},
+	"edi": {
+		"active": false,
+		"host": "sftp-na.amazonvendorcentral.com",
+		"port": 22,
+		"username": "<YOUR_EDI_USERNAME>",
+		"privateKeyPath": "/path/to/your/ssh_private_key",
+		"inboundDir": "/download",
+		"outboundDir": "/upload"
+	},
+	"storage": {
+		"outputFormat": "json",
+		"savePath": "output/",
+		"fileName": "order_data"
+	}
+}

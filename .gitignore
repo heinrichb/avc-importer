@@ -1,0 +1,33 @@
+# Go binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build artifacts and local bin directories
+bin
+build
+output
+dist
+
+# Test binaries (built with `go test -c`)
+*.test
+
+# Dependency directories
+vendor
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Editor/OS-specific
+.DS_Store
+.idea
+
+# Environment variables
+.env
+
+# Ignore all configs except default.json
+configs/*
+!configs/default.json
