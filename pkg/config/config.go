@@ -1,4 +1,4 @@
-// pkg/config/config.go
+// pkg/utils/config.go
 package config
 
 import (
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/heinrichb/awsimporter/pkg/utils"
+	"github.com/heinrichb/avcimporter/pkg/utils"
 )
 
 /*
@@ -18,12 +18,12 @@ It is set in `main.go` and used throughout the application.
 var Verbose bool
 
 /*
-Config holds configuration data used by AWS Importer CLI.
+Config holds configuration data used by AVC Importer CLI.
 
 Fields:
   - Version:      The current version of the configuration.
   - API:          SP‑API credentials and endpoints.
-	  - Active:         OAuth2 credentials for SP‑API access.
+      - Active:        Enable the SP‑API flow when true.
       - Auth:
           - ClientID:     The client ID provided by Amazon SP‑API.
           - ClientSecret: The client secret associated with the ClientID.
@@ -33,12 +33,14 @@ Fields:
       - TokenURL:      The URL to retrieve OAuth2 tokens.
       - EndpointURL:   The SP‑API path to fetch data (e.g. purchase orders).
   - EDI:          SFTP credentials and directories for EDI integration.
+      - Active:        Enable the EDI/SFTP flow when true.
       - Host:           The SFTP server hostname.
       - Port:           The SFTP port (usually 22).
       - Username:       The SFTP username assigned by Amazon.
       - PrivateKeyPath: Path to your SSH private key for authentication.
       - InboundDir:     Directory where PO files land.
       - OutboundDir:    Directory for ACKs and other outbound messages.
+      - SenderID:       Your Amazon‑assigned SFTP ID (the “YOURID” in 997).
   - Storage:      Settings for where and how to save fetched data.
       - OutputFormat: The format to save data (e.g. json).
       - SavePath:     Directory path for saving files.
@@ -47,8 +49,8 @@ Fields:
 type Config struct {
 	Version string `json:"version"`
 	API     struct {
-		Active      bool   `json:"active"`
-		Auth struct {
+		Active      bool `json:"active"`
+		Auth        struct {
 			ClientID      string `json:"clientId"`
 			ClientSecret  string `json:"clientSecret"`
 			ApplicationID string `json:"applicationId"`
@@ -66,6 +68,7 @@ type Config struct {
 		PrivateKeyPath string `json:"privateKeyPath"`
 		InboundDir     string `json:"inboundDir"`
 		OutboundDir    string `json:"outboundDir"`
+		SenderID       string `json:"senderId"`
 	} `json:"edi"`
 	Storage struct {
 		OutputFormat string `json:"outputFormat"`
@@ -82,7 +85,7 @@ values replace existing configuration.
 type ConfigOverride struct {
 	Version *string `json:"version"`
 	API     *struct {
-		Auth *struct {
+		Auth        *struct {
 			ClientID      *string `json:"clientId"`
 			ClientSecret  *string `json:"clientSecret"`
 			ApplicationID *string `json:"applicationId"`
@@ -99,6 +102,7 @@ type ConfigOverride struct {
 		PrivateKeyPath *string `json:"privateKeyPath"`
 		InboundDir     *string `json:"inboundDir"`
 		OutboundDir    *string `json:"outboundDir"`
+		SenderID       *string `json:"senderId"`
 	} `json:"edi"`
 	Storage *struct {
 		OutputFormat *string `json:"outputFormat"`
@@ -107,9 +111,6 @@ type ConfigOverride struct {
 	} `json:"storage"`
 }
 
-/*
-ApplyDefaults populates missing fields in the Config struct with default values.
-*/
 func (cfg *Config) ApplyDefaults() {
 	if cfg.API.BaseURL == "" {
 		cfg.API.BaseURL = "https://sellingpartnerapi-na.amazon.com"
@@ -211,6 +212,9 @@ func (cfg *Config) OverrideConfig(o ConfigOverride) {
 		}
 		if o.EDI.OutboundDir != nil {
 			cfg.EDI.OutboundDir = *o.EDI.OutboundDir
+		}
+		if o.EDI.SenderID != nil {
+			cfg.EDI.SenderID = *o.EDI.SenderID
 		}
 	}
 	if o.Storage != nil {

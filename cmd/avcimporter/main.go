@@ -1,4 +1,4 @@
-// cmd/awsimporter/main.go
+// cmd/avcimporter/main.go
 package main
 
 import (
@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 
-	"github.com/heinrichb/awsimporter/pkg/config"
-	"github.com/heinrichb/awsimporter/pkg/utils"
+	"github.com/heinrichb/avcimporter/pkg/config"
+	"github.com/heinrichb/avcimporter/pkg/utils"
 )
 
 /*
@@ -33,7 +34,7 @@ func init() {
 }
 
 /*
-main is the entry point of AWS Importer CLI.
+main is the entry point of AVC Importer CLI.
 
 It parses command-line flags, prints a welcome message, loads the configuration,
 and then either runs the EDI/SFTP flow or the SP‑API flow based on the config.
@@ -42,7 +43,7 @@ func main() {
 	flag.Parse()
 	config.Verbose = verbose
 
-	utils.PrintColored("Starting AWS Importer!", "", "#00FFFF")
+	utils.PrintColored("Starting AVC Importer!", "", "#00FFFF")
 
 	if configPath == "" {
 		configPath = "configs/default.json"
@@ -54,46 +55,73 @@ func main() {
 		os.Exit(1)
 	}
 
-	if (cfg.API.Active || cfg.EDI.Active) {
+	// If neither EDI nor API is active, abort
+	if !cfg.EDI.Active && !cfg.API.Active {
 		utils.PrintColored("No valid API or EDI configuration found.", "", "#FF0000")
 		os.Exit(1)
-	} else {
-		// If EDI is active, run the SFTP-based flow
-		if cfg.EDI.Active {
-			files, err := utils.FetchFilesOverSFTP(
+	}
+
+	// EDI / SFTP flow
+	if cfg.EDI.Active {
+		files, err := utils.FetchFilesOverSFTP(
+			cfg.EDI.Host,
+			cfg.EDI.Port,
+			cfg.EDI.Username,
+			cfg.EDI.PrivateKeyPath,
+			cfg.EDI.InboundDir,
+			cfg.Storage.SavePath,
+		)
+		if err != nil {
+			utils.PrintColored("SFTP download failed: ", err.Error(), "#FF0000")
+			os.Exit(1)
+		}
+		for _, f := range files {
+			utils.PrintColored("Downloaded: ", f, "#00FFFF")
+
+			raw, err := os.ReadFile(f)
+			if err != nil {
+				utils.PrintColored("Error reading inbound file: ", err.Error(), "#FF0000")
+				continue
+			}
+
+			ack, err := utils.Generate997(string(raw), cfg.EDI.SenderID)
+			if err != nil {
+				utils.PrintColored("Error generating 997: ", err.Error(), "#FF0000")
+				continue
+			}
+
+			ackName := filepath.Base(f) + ".997"
+			err = utils.UploadFileOverSFTP(
 				cfg.EDI.Host,
 				cfg.EDI.Port,
 				cfg.EDI.Username,
 				cfg.EDI.PrivateKeyPath,
-				cfg.EDI.InboundDir,
-				cfg.Storage.SavePath,
+				cfg.EDI.OutboundDir,
+				ackName,
+				[]byte(ack),
 			)
 			if err != nil {
-				utils.PrintColored("SFTP download failed: ", err.Error(), "#FF0000")
-				os.Exit(1)
-			}
-			for _, f := range files {
-				utils.PrintColored("Downloaded: ", f, "#00FFFF")
-				// TODO: parse X12 and insert into database
-			}
-
-		}
-		// If API is active, run the SP‑API flow
-		if cfg.API.Active {
-			token, err := fetchOAuthToken(cfg)
-			if err != nil {
-				utils.PrintColored("Error fetching OAuth2 token: ", err.Error(), "#FF0000")
-				os.Exit(1)
-			}
-			if err := fetchFromAPI(cfg, token); err != nil {
-				utils.PrintColored("Error fetching data from API: ", err.Error(), "#FF0000")
-				os.Exit(1)
+				utils.PrintColored("Error uploading 997: ", err.Error(), "#FF0000")
+			} else {
+				utils.PrintColored("Uploaded 997: ", ackName, "#00FF00")
 			}
 		}
 	}
 
+	// SP‑API flow
+	if cfg.API.Active {
+		token, err := fetchOAuthToken(cfg)
+		if err != nil {
+			utils.PrintColored("Error fetching OAuth2 token: ", err.Error(), "#FF0000")
+			os.Exit(1)
+		}
+		if err := fetchFromAPI(cfg, token); err != nil {
+			utils.PrintColored("Error fetching data from API: ", err.Error(), "#FF0000")
+			os.Exit(1)
+		}
+	}
 
-	utils.PrintColored("AWS Importer CLI completed successfully.", "", "#32CD32")
+	utils.PrintColored("AVC Importer CLI completed successfully.", "", "#32CD32")
 }
 
 /*
@@ -119,7 +147,7 @@ func fetchOAuthToken(cfg *config.Config) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("failed to fetch token: %s", string(body))
 	}
 
@@ -160,11 +188,11 @@ func fetchFromAPI(cfg *config.Config, token string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to fetch data from API: %s", string(body))
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	if verbose {
 		utils.PrintColored("API Response: ", string(body), "#00FFFF")
 	} else {

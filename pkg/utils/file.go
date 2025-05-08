@@ -1,9 +1,9 @@
+// pkg/utils/file.go
 package utils
 
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -41,8 +41,8 @@ func SaveToFile(path string, filename string, data interface{}) error {
 		}
 	}
 
-	err = ioutil.WriteFile(fullPath, output, 0644)
-	if err != nil {
+	// Use os.WriteFile instead of ioutil.WriteFile
+	if err := os.WriteFile(fullPath, output, 0644); err != nil {
 		return fmt.Errorf("failed to write to file %s: %w", fullPath, err)
 	}
 
@@ -64,7 +64,8 @@ func LoadFromFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("file %s does not exist", path)
 	}
 
-	content, err := ioutil.ReadFile(path)
+	// Use os.ReadFile instead of ioutil.ReadFile
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
 	}
@@ -83,8 +84,7 @@ Returns:
 */
 func CreateDirectoryIfNotExist(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err = os.MkdirAll(path, 0755)
-		if err != nil {
+		if err := os.MkdirAll(path, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", path, err)
 		}
 	}

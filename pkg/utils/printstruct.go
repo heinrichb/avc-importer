@@ -1,3 +1,4 @@
+// pkg/utils/printstruct.go
 package utils
 
 import (
