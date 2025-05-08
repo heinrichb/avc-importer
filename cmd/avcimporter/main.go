@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/heinrichb/avcimporter/pkg/config"
 	"github.com/heinrichb/avcimporter/pkg/utils"
@@ -61,7 +60,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// EDI / SFTP flow
+	// EDI / SFTP flow: download & delete only
 	if cfg.EDI.Active {
 		files, err := utils.FetchFilesOverSFTP(
 			cfg.EDI.Host,
@@ -76,35 +75,7 @@ func main() {
 			os.Exit(1)
 		}
 		for _, f := range files {
-			utils.PrintColored("Downloaded: ", f, "#00FFFF")
-
-			raw, err := os.ReadFile(f)
-			if err != nil {
-				utils.PrintColored("Error reading inbound file: ", err.Error(), "#FF0000")
-				continue
-			}
-
-			ack, err := utils.Generate997(string(raw), cfg.EDI.SenderID)
-			if err != nil {
-				utils.PrintColored("Error generating 997: ", err.Error(), "#FF0000")
-				continue
-			}
-
-			ackName := filepath.Base(f) + ".997"
-			err = utils.UploadFileOverSFTP(
-				cfg.EDI.Host,
-				cfg.EDI.Port,
-				cfg.EDI.Username,
-				cfg.EDI.PrivateKeyPath,
-				cfg.EDI.OutboundDir,
-				ackName,
-				[]byte(ack),
-			)
-			if err != nil {
-				utils.PrintColored("Error uploading 997: ", err.Error(), "#FF0000")
-			} else {
-				utils.PrintColored("Uploaded 997: ", ackName, "#00FF00")
-			}
+			utils.PrintColored("Downloaded and removed remote file: ", f, "#00FFFF")
 		}
 	}
 

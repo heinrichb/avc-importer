@@ -24,7 +24,7 @@ Parameters:
   - port:           SFTP port (usually 22).
   - username:       Username for SSH authentication.
   - privateKeyPath: Path to the SSH private key file for key-based auth.
-  - remoteDir:      Directory on the SFTP server containing files to download (e.g. "download").
+  - remoteDir:      Directory on the SFTP server containing files to download (e.g. "/download").
   - localDir:       Local base directory where files will be saved.
 
 Returns:
@@ -32,6 +32,9 @@ Returns:
   - error:    Non-nil if any step fails.
 */
 func FetchFilesOverSFTP(host string, port int, username, privateKeyPath, remoteDir, localDir string) ([]string, error) {
+	// Amazon’s SFTP uses relative dirs under your home (e.g. "download"), so strip any leading slash.
+	remoteDir = strings.TrimPrefix(remoteDir, "/")
+
 	// Load private key
 	key, err := os.ReadFile(privateKeyPath)
 	if err != nil {
@@ -42,7 +45,6 @@ func FetchFilesOverSFTP(host string, port int, username, privateKeyPath, remoteD
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 
-	// SSH client config
 	sshCfg := &ssh.ClientConfig{
 		User:            username,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
@@ -50,28 +52,31 @@ func FetchFilesOverSFTP(host string, port int, username, privateKeyPath, remoteD
 		Timeout:         10 * time.Second,
 	}
 
-	addr := fmt.Sprintf("%s:%d", host, port)
-	conn, err := ssh.Dial("tcp", addr, sshCfg)
+	conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, port), sshCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial SSH: %w", err)
 	}
 	defer conn.Close()
 
-	sftpClient, err := sftp.NewClient(conn)
+	client, err := sftp.NewClient(conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SFTP client: %w", err)
 	}
-	defer sftpClient.Close()
+	defer client.Close()
 
-	// List entries in remoteDir
-	entries, err := sftpClient.ReadDir(remoteDir)
+	// Now list under “download”, not “/download”
+	entries, err := client.ReadDir(remoteDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read remote directory %s: %w", remoteDir, err)
 	}
 
-	// Ensure local directory exists
+	if len(entries) == 0 {
+		fmt.Printf("No files found in %s\n", remoteDir)
+		return nil, nil
+	}
+
 	if err := os.MkdirAll(localDir, 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create local directory %s: %w", localDir, err)
+		return nil, fmt.Errorf("failed to create local dir %s: %w", localDir, err)
 	}
 
 	var downloaded []string
@@ -79,35 +84,28 @@ func FetchFilesOverSFTP(host string, port int, username, privateKeyPath, remoteD
 		if entry.IsDir() {
 			continue
 		}
-		remotePath := path.Join(remoteDir, entry.Name())
+		remotePath := filepath.Join(remoteDir, entry.Name())
 		localPath := filepath.Join(localDir, entry.Name())
 
-		// Open remote file
-		rf, err := sftpClient.Open(remotePath)
+		rf, err := client.Open(remotePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open remote file %s: %w", remotePath, err)
+			return nil, fmt.Errorf("open remote %s: %w", remotePath, err)
 		}
-
-		// Create local file
 		lf, err := os.Create(localPath)
 		if err != nil {
 			rf.Close()
-			return nil, fmt.Errorf("failed to create local file %s: %w", localPath, err)
+			return nil, fmt.Errorf("create local %s: %w", localPath, err)
 		}
-
-		// Copy contents
 		if _, err := io.Copy(lf, rf); err != nil {
-			lf.Close()
 			rf.Close()
-			return nil, fmt.Errorf("failed to copy %s to %s: %w", remotePath, localPath, err)
+			lf.Close()
+			return nil, fmt.Errorf("copy %s to %s: %w", remotePath, localPath, err)
 		}
-
-		lf.Close()
 		rf.Close()
+		lf.Close()
 
-		// Delete remote file so Amazon’s receiving test passes
-		if err := sftpClient.Remove(remotePath); err != nil {
-			return nil, fmt.Errorf("failed to delete remote file %s: %w", remotePath, err)
+		if err := client.Remove(remotePath); err != nil {
+			return nil, fmt.Errorf("delete remote %s: %w", remotePath, err)
 		}
 
 		downloaded = append(downloaded, localPath)
@@ -147,7 +145,6 @@ func UploadFileOverSFTP(
 		return fmt.Errorf("parse private key: %w", err)
 	}
 
-	// SSH config
 	sshCfg := &ssh.ClientConfig{
 		User:            username,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
@@ -155,23 +152,21 @@ func UploadFileOverSFTP(
 		Timeout:         10 * time.Second,
 	}
 
-	// dial
 	conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, port), sshCfg)
 	if err != nil {
 		return fmt.Errorf("ssh dial: %w", err)
 	}
 	defer conn.Close()
 
-	// sftp client
 	client, err := sftp.NewClient(conn)
 	if err != nil {
 		return fmt.Errorf("sftp client: %w", err)
 	}
 	defer client.Close()
 
-	// ensure remoteDir is relative, then prepend "/"
+	// ensure remoteDir is relative, not absolute
 	remoteDir = strings.TrimPrefix(remoteDir, "/")
-	remotePath := path.Join("/", remoteDir, fileName)
+	remotePath := path.Join(remoteDir, fileName)
 
 	f, err := client.Create(remotePath)
 	if err != nil {

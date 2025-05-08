@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/heinrichb/awsimporter/pkg/utils"
+	"github.com/heinrichb/avcimporter/pkg/utils"
 )
 
 // detailedCoverageRegex matches typical coverage detail lines from `go tool cover -func`.
