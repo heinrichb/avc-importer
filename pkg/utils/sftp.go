@@ -24,7 +24,7 @@ Parameters:
   - port:           SFTP port (usually 22).
   - username:       Username for SSH authentication.
   - privateKeyPath: Path to the SSH private key file for key-based auth.
-  - remoteDir:      Directory on the SFTP server containing files to download (e.g. "/download").
+  - remoteDir:      Directory on the SFTP server containing files to download (e.g. "download").
   - localDir:       Local base directory where files will be saved.
 
 Returns:
@@ -64,7 +64,6 @@ func FetchFilesOverSFTP(host string, port int, username, privateKeyPath, remoteD
 	}
 	defer client.Close()
 
-	// Now list under “download”, not “/download”
 	entries, err := client.ReadDir(remoteDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read remote directory %s: %w", remoteDir, err)
@@ -135,7 +134,7 @@ func UploadFileOverSFTP(
 	username, privateKeyPath, remoteDir, fileName string,
 	data []byte,
 ) error {
-	// load private key
+	// Load private key
 	key, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		return fmt.Errorf("read private key: %w", err)
@@ -164,7 +163,7 @@ func UploadFileOverSFTP(
 	}
 	defer client.Close()
 
-	// ensure remoteDir is relative, not absolute
+	// Strip leading slash so remoteDir is relative under the SFTP home directory
 	remoteDir = strings.TrimPrefix(remoteDir, "/")
 	remotePath := path.Join(remoteDir, fileName)
 

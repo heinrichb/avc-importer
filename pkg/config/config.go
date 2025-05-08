@@ -17,40 +17,41 @@ It is set in `main.go` and used throughout the application.
 */
 var Verbose bool
 
-/*
-Config holds configuration data used by AVC Importer CLI.
+// Config holds configuration data used by AVC Importer CLI.
 
-Fields:
-  - Version:      The current version of the configuration.
-  - API:          SP‑API credentials and endpoints.
-      - Active:        Enable the SP‑API flow when true.
-      - Auth:
-          - ClientID:     The client ID provided by Amazon SP‑API.
-          - ClientSecret: The client secret associated with the ClientID.
-          - ApplicationID: The unique identifier for your registered application.
-          - RefreshToken:  The OAuth2 refresh token for renewing access tokens.
-      - BaseURL:       The base URL for SP‑API requests.
-      - TokenURL:      The URL to retrieve OAuth2 tokens.
-      - EndpointURL:   The SP‑API path to fetch data (e.g. purchase orders).
-  - EDI:          SFTP credentials and directories for EDI integration.
-      - Active:        Enable the EDI/SFTP flow when true.
-      - Host:           The SFTP server hostname.
-      - Port:           The SFTP port (usually 22).
-      - Username:       The SFTP username assigned by Amazon.
-      - PrivateKeyPath: Path to your SSH private key for authentication.
-      - InboundDir:     Directory where PO files land.
-      - OutboundDir:    Directory for ACKs and other outbound messages.
-      - SenderID:       Your Amazon‑assigned SFTP ID (the “YOURID” in 997).
-  - Storage:      Settings for where and how to save fetched data.
-      - OutputFormat: The format to save data (e.g. json).
-      - SavePath:     Directory path for saving files.
-      - FileName:     Base name for saved files.
-*/
+// Fields:
+//   - Version:         The current version of the configuration.
+//   - API:             SP‑API credentials and endpoints.
+//       - Active:         Enable the SP‑API flow when true.
+//       - Auth:
+//           - ClientID:      The client ID provided by Amazon SP‑API.
+//           - ClientSecret:  The client secret associated with the ClientID.
+//           - ApplicationID: The unique identifier for your registered application.
+//           - RefreshToken:  The OAuth2 refresh token for renewing access tokens.
+//       - BaseURL:        The base URL for SP‑API requests.
+//       - TokenURL:       The URL to retrieve OAuth2 tokens.
+//       - EndpointURL:    The SP‑API path to fetch data (e.g. purchase orders).
+//   - EDI:             SFTP credentials and directories for EDI integration.
+//       - Active:            Enable the EDI/SFTP flow when true.
+//       - Host:              The SFTP server hostname.
+//       - Port:              The SFTP port (usually 22).
+//       - DownloadUsername:  Username for downloading (receiving) files.
+//       - UploadUsername:    Username for sending (uploading) files.
+//       - PrivateKeyPath:    Path to your SSH private key for authentication.
+//       - InboundDir:        Directory where PO files land (e.g. "download").
+//       - OutboundDir:       Directory for ACKs or feed uploads (e.g. "upload").
+//       - SenderID:          Your Amazon‑assigned SFTP ID (the “YOURID” in 997).
+//   - Storage:         Settings for where and how to save fetched data.
+//       - OutputFormat:     The format to save data (e.g. json).
+//       - SavePath:         Directory path for saving files.
+//       - FileName:         Base name for saved files.
+
 type Config struct {
 	Version string `json:"version"`
-	API     struct {
-		Active      bool `json:"active"`
-		Auth        struct {
+
+	API struct {
+		Active bool `json:"active"`
+		Auth   struct {
 			ClientID      string `json:"clientId"`
 			ClientSecret  string `json:"clientSecret"`
 			ApplicationID string `json:"applicationId"`
@@ -60,16 +61,19 @@ type Config struct {
 		TokenURL    string `json:"tokenUrl"`
 		EndpointURL string `json:"endpointUrl"`
 	} `json:"api"`
+
 	EDI struct {
-		Active         bool   `json:"active"`
-		Host           string `json:"host"`
-		Port           int    `json:"port"`
-		Username       string `json:"username"`
-		PrivateKeyPath string `json:"privateKeyPath"`
-		InboundDir     string `json:"inboundDir"`
-		OutboundDir    string `json:"outboundDir"`
-		SenderID       string `json:"senderId"`
+		Active           bool   `json:"active"`
+		Host             string `json:"host"`
+		Port             int    `json:"port"`
+		DownloadUsername string `json:"downloadUsername"`
+		UploadUsername   string `json:"uploadUsername"`
+		PrivateKeyPath   string `json:"privateKeyPath"`
+		InboundDir       string `json:"inboundDir"`
+		OutboundDir      string `json:"outboundDir"`
+		SenderID         string `json:"senderId"`
 	} `json:"edi"`
+
 	Storage struct {
 		OutputFormat string `json:"outputFormat"`
 		SavePath     string `json:"savePath"`
@@ -84,8 +88,9 @@ values replace existing configuration.
 */
 type ConfigOverride struct {
 	Version *string `json:"version"`
-	API     *struct {
-		Auth        *struct {
+
+	API *struct {
+		Auth *struct {
 			ClientID      *string `json:"clientId"`
 			ClientSecret  *string `json:"clientSecret"`
 			ApplicationID *string `json:"applicationId"`
@@ -95,15 +100,18 @@ type ConfigOverride struct {
 		TokenURL    *string `json:"tokenUrl"`
 		EndpointURL *string `json:"endpointUrl"`
 	} `json:"api"`
+
 	EDI *struct {
-		Host           *string `json:"host"`
-		Port           *int    `json:"port"`
-		Username       *string `json:"username"`
-		PrivateKeyPath *string `json:"privateKeyPath"`
-		InboundDir     *string `json:"inboundDir"`
-		OutboundDir    *string `json:"outboundDir"`
-		SenderID       *string `json:"senderId"`
+		Host             *string `json:"host"`
+		Port             *int    `json:"port"`
+		DownloadUsername *string `json:"downloadUsername"`
+		UploadUsername   *string `json:"uploadUsername"`
+		PrivateKeyPath   *string `json:"privateKeyPath"`
+		InboundDir       *string `json:"inboundDir"`
+		OutboundDir      *string `json:"outboundDir"`
+		SenderID         *string `json:"senderId"`
 	} `json:"edi"`
+
 	Storage *struct {
 		OutputFormat *string `json:"outputFormat"`
 		SavePath     *string `json:"savePath"`
@@ -147,18 +155,22 @@ func Load(filePath string) (*Config, error) {
 		return nil, fmt.Errorf("config file %s does not exist", filePath)
 	}
 	utils.PrintColored("Loaded config from: ", filePath, "#32CD32")
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
+
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
+
 	cfg.ApplyDefaults()
 	if Verbose {
 		utils.PrintNonEmptyFields("", cfg)
 	}
+
 	return &cfg, nil
 }
 
@@ -201,8 +213,11 @@ func (cfg *Config) OverrideConfig(o ConfigOverride) {
 		if o.EDI.Port != nil {
 			cfg.EDI.Port = *o.EDI.Port
 		}
-		if o.EDI.Username != nil {
-			cfg.EDI.Username = *o.EDI.Username
+		if o.EDI.DownloadUsername != nil {
+			cfg.EDI.DownloadUsername = *o.EDI.DownloadUsername
+		}
+		if o.EDI.UploadUsername != nil {
+			cfg.EDI.UploadUsername = *o.EDI.UploadUsername
 		}
 		if o.EDI.PrivateKeyPath != nil {
 			cfg.EDI.PrivateKeyPath = *o.EDI.PrivateKeyPath
