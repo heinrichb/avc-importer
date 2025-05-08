@@ -5,6 +5,7 @@
 		"auth": {
 			"clientId": "exampleClientID",
 			"clientSecret": "exampleClientSecret",
+			"clientSecretRotation": "exampleClientSecretRotation",
 			"applicationId": "exampleApplicationID",
 			"refreshToken": "exampleRefreshToken"
 		},
