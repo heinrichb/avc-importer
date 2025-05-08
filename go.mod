@@ -1,4 +1,4 @@
-module github.com/heinrichb/awsimporter
+module github.com/heinrichb/avcimporter
 
 go 1.23.0
 

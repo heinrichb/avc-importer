@@ -19,7 +19,8 @@
 		"username": "<YOUR_EDI_USERNAME>",
 		"privateKeyPath": "/path/to/your/ssh_private_key",
 		"inboundDir": "/download",
-		"outboundDir": "/upload"
+		"outboundDir": "/upload",
+		"senderId": "<YOUR_SENDER_ID>"
 	},
 	"storage": {
 		"outputFormat": "json",

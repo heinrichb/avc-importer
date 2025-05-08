@@ -18,7 +18,7 @@ INSTALL_STAMP   := $(STAMPS_DIR)/install.stamp
 BUILD_STAMP     := $(STAMPS_DIR)/build.stamp
 TEST_STAMP      := $(STAMPS_DIR)/test.stamp
 
-BINARY          := $(BUILD_DIR)/awsimporter
+BINARY          := $(BUILD_DIR)/avcimporter
 
 # Coverage output
 COVER_DIR       := ${BUILD_DIR}/coverage
@@ -69,7 +69,7 @@ test:
 		if gotestsum --format short-verbose ./... && \
 		   go test -cover -covermode=atomic -coverpkg=./... -coverprofile="$(COVER_PROFILE)" ./... >/dev/null; then \
 			if [ -f "$(COVER_PROFILE)" ]; then \
-				grep -v "cmd/awsimporter/main.go:" "$(COVER_PROFILE)" > "$(COVER_PROFILE).tmp" && mv "$(COVER_PROFILE).tmp" "$(COVER_PROFILE)"; \
+				grep -v "cmd/avcimporter/main.go:" "$(COVER_PROFILE)" > "$(COVER_PROFILE).tmp" && mv "$(COVER_PROFILE).tmp" "$(COVER_PROFILE)"; \
 				go tool cover -html="$(COVER_PROFILE)" -o "$(COVER_HTML)"; \
 				echo "Coverage file generated at: $(COVER_PROFILE)"; \
 				echo "HTML coverage report at: $(COVER_HTML)"; \
@@ -104,7 +104,7 @@ build: install
 	@TARGET=build; \
 	if [ ! -f "$(BUILD_STAMP)" ] || [ -n "$$(find $(GO_FILES) -newer "$(BUILD_STAMP)" 2>/dev/null)" ]; then \
 		echo "$(CHANGE_MSG) $$TARGET..."; \
-		go build -o $(BINARY) ./cmd/awsimporter; \
+		go build -o $(BINARY) ./cmd/avcimporter; \
 		touch "$(BUILD_STAMP)"; \
 		echo "Done with building."; \
 	else \

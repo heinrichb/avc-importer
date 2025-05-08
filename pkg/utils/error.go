@@ -1,3 +1,4 @@
+// pkg/utils/error.go
 package utils
 
 import (
