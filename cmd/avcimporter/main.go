@@ -59,7 +59,7 @@ func main() {
 
 	// EDI / SFTP flow: download incoming files, then send ConnectivityTest
 	if cfg.EDI.Active {
-		// Download any inbound files
+		// Download any inbound files, controlling deletion via config
 		files, err := utils.FetchFilesOverSFTP(
 			cfg.EDI.Host,
 			cfg.EDI.Port,
@@ -67,16 +67,23 @@ func main() {
 			cfg.EDI.PrivateKeyPath,
 			cfg.EDI.InboundDir,
 			cfg.Storage.SavePath,
+			cfg.EDI.DeleteAfterDownload,
 		)
 		if err != nil {
 			utils.PrintColored("SFTP download failed: ", err.Error(), "#FF0000")
 			os.Exit(1)
 		}
 		for _, f := range files {
-			utils.PrintColored("Downloaded and removed remote file: ", f, "#00FFFF")
+			if cfg.EDI.DeleteAfterDownload {
+				utils.PrintColored("Downloaded and removed remote file: ", f, "#00FFFF")
+			} else {
+				utils.PrintColored("Downloaded remote file: ", f, "#00FFFF")
+			}
 		}
 
 		// Send Amazon connectivity test file
+		// TODO: Replace with your actual payload
+		// This is a sample EDI 855 file for testing purposes.
 		payload := []byte("ISA*00*          *00*          *ZZ*1691449        *ZZ*AMAZON         *250508*1540*U*00400*900000014*0*T*>~GS*PR*1691449*AMAZON*20250508*1540*900000014*X*004010~ST*855*0001~BAK*00*AC*CONNECTIVITYTEST*20250508~PO1*1*23*UP*23.45*PE*EN*1234567891234~ACK*IA*23*UP~CTT*1*23~SE*6*0001~GE*1*900000014~IEA*1*900000014~")
 		if err := utils.UploadFileOverSFTP(
 			cfg.EDI.Host,

@@ -16,7 +16,7 @@ import (
 
 /*
 FetchFilesOverSFTP connects to an SFTP server, downloads all files in the specified remote directory,
-saves them into the local directory, then deletes them from the server (to satisfy Amazon’s receiving test).
+saves them into the local directory, then optionally deletes them from the server.
 Returns a slice of paths to the downloaded files.
 
 Parameters:
@@ -26,12 +26,18 @@ Parameters:
   - privateKeyPath: Path to the SSH private key file for key-based auth.
   - remoteDir:      Directory on the SFTP server containing files to download (e.g. "download").
   - localDir:       Local base directory where files will be saved.
+  - deleteAfter:    If true, remove each remote file after downloading.
 
 Returns:
   - []string: List of local file paths downloaded.
   - error:    Non-nil if any step fails.
 */
-func FetchFilesOverSFTP(host string, port int, username, privateKeyPath, remoteDir, localDir string) ([]string, error) {
+func FetchFilesOverSFTP(
+	host string,
+	port int,
+	username, privateKeyPath, remoteDir, localDir string,
+	deleteAfter bool,
+) ([]string, error) {
 	// Amazon’s SFTP uses relative dirs under your home (e.g. "download"), so strip any leading slash.
 	remoteDir = strings.TrimPrefix(remoteDir, "/")
 
@@ -103,8 +109,10 @@ func FetchFilesOverSFTP(host string, port int, username, privateKeyPath, remoteD
 		rf.Close()
 		lf.Close()
 
-		if err := client.Remove(remotePath); err != nil {
-			return nil, fmt.Errorf("delete remote %s: %w", remotePath, err)
+		if deleteAfter {
+			if err := client.Remove(remotePath); err != nil {
+				return nil, fmt.Errorf("delete remote %s: %w", remotePath, err)
+			}
 		}
 
 		downloaded = append(downloaded, localPath)

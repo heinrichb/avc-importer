@@ -17,35 +17,37 @@ It is set in `main.go` and used throughout the application.
 */
 var Verbose bool
 
-// Config holds configuration data used by AVC Importer CLI.
+/*
+	Config holds configuration data used by AVC Importer CLI.
 
-// Fields:
-//   - Version:         The current version of the configuration.
-//   - API:             SP‑API credentials and endpoints.
-//       - Active:         Enable the SP‑API flow when true.
-//       - Auth:
-//           - ClientID:      The client ID provided by Amazon SP‑API.
-//           - ClientSecret:  The client secret associated with the ClientID.
-//           - ApplicationID: The unique identifier for your registered application.
-//           - RefreshToken:  The OAuth2 refresh token for renewing access tokens.
-//       - BaseURL:        The base URL for SP‑API requests.
-//       - TokenURL:       The URL to retrieve OAuth2 tokens.
-//       - EndpointURL:    The SP‑API path to fetch data (e.g. purchase orders).
-//   - EDI:             SFTP credentials and directories for EDI integration.
-//       - Active:            Enable the EDI/SFTP flow when true.
-//       - Host:              The SFTP server hostname.
-//       - Port:              The SFTP port (usually 22).
-//       - DownloadUsername:  Username for downloading (receiving) files.
-//       - UploadUsername:    Username for sending (uploading) files.
-//       - PrivateKeyPath:    Path to your SSH private key for authentication.
-//       - InboundDir:        Directory where PO files land (e.g. "download").
-//       - OutboundDir:       Directory for ACKs or feed uploads (e.g. "upload").
-//       - SenderID:          Your Amazon‑assigned SFTP ID (the “YOURID” in 997).
-//   - Storage:         Settings for where and how to save fetched data.
-//       - OutputFormat:     The format to save data (e.g. json).
-//       - SavePath:         Directory path for saving files.
-//       - FileName:         Base name for saved files.
-
+Fields:
+  - Version:         The current version of the configuration.
+  - API:             SP‑API credentials and endpoints.
+  - Active:         Enable the SP‑API flow when true.
+  - Auth:
+  - ClientID:      The client ID provided by Amazon SP‑API.
+  - ClientSecret:  The client secret associated with the ClientID.
+  - ApplicationID: The unique identifier for your registered application.
+  - RefreshToken:  The OAuth2 refresh token for renewing access tokens.
+  - BaseURL:        The base URL for SP‑API requests.
+  - TokenURL:       The URL to retrieve OAuth2 tokens.
+  - EndpointURL:    The SP‑API path to fetch data (e.g. purchase orders).
+  - EDI:             SFTP credentials and directories for EDI integration.
+  - Active:            Enable the EDI/SFTP flow when true.
+  - Host:              The SFTP server hostname.
+  - Port:              The SFTP port (usually 22).
+  - DownloadUsername:  Username for downloading (receiving) files.
+  - UploadUsername:    Username for sending (uploading) files.
+  - PrivateKeyPath:    Path to your SSH private key for authentication.
+  - InboundDir:        Directory where PO files land (e.g. "download").
+  - OutboundDir:       Directory for ACKs or feed uploads (e.g. "upload").
+  - SenderID:          Your Amazon‑assigned SFTP ID (the “YOURID” in 997).
+  - DeleteAfterDownload: If true, remove files from the SFTP server after downloading.
+  - Storage:         Settings for where and how to save fetched data.
+  - OutputFormat:     The format to save data (e.g. json).
+  - SavePath:         Directory path for saving files.
+  - FileName:         Base name for saved files.
+*/
 type Config struct {
 	Version string `json:"version"`
 
@@ -63,15 +65,16 @@ type Config struct {
 	} `json:"api"`
 
 	EDI struct {
-		Active           bool   `json:"active"`
-		Host             string `json:"host"`
-		Port             int    `json:"port"`
-		DownloadUsername string `json:"downloadUsername"`
-		UploadUsername   string `json:"uploadUsername"`
-		PrivateKeyPath   string `json:"privateKeyPath"`
-		InboundDir       string `json:"inboundDir"`
-		OutboundDir      string `json:"outboundDir"`
-		SenderID         string `json:"senderId"`
+		Active              bool   `json:"active"`
+		Host                string `json:"host"`
+		Port                int    `json:"port"`
+		DownloadUsername    string `json:"downloadUsername"`
+		UploadUsername      string `json:"uploadUsername"`
+		PrivateKeyPath      string `json:"privateKeyPath"`
+		InboundDir          string `json:"inboundDir"`
+		OutboundDir         string `json:"outboundDir"`
+		SenderID            string `json:"senderId"`
+		DeleteAfterDownload bool   `json:"deleteAfterDownload"`
 	} `json:"edi"`
 
 	Storage struct {
@@ -102,14 +105,15 @@ type ConfigOverride struct {
 	} `json:"api"`
 
 	EDI *struct {
-		Host             *string `json:"host"`
-		Port             *int    `json:"port"`
-		DownloadUsername *string `json:"downloadUsername"`
-		UploadUsername   *string `json:"uploadUsername"`
-		PrivateKeyPath   *string `json:"privateKeyPath"`
-		InboundDir       *string `json:"inboundDir"`
-		OutboundDir      *string `json:"outboundDir"`
-		SenderID         *string `json:"senderId"`
+		Host                *string `json:"host"`
+		Port                *int    `json:"port"`
+		DownloadUsername    *string `json:"downloadUsername"`
+		UploadUsername      *string `json:"uploadUsername"`
+		PrivateKeyPath      *string `json:"privateKeyPath"`
+		InboundDir          *string `json:"inboundDir"`
+		OutboundDir         *string `json:"outboundDir"`
+		SenderID            *string `json:"senderId"`
+		DeleteAfterDownload *bool   `json:"deleteAfterDownload"`
 	} `json:"edi"`
 
 	Storage *struct {
@@ -138,6 +142,8 @@ func (cfg *Config) ApplyDefaults() {
 	if cfg.Storage.FileName == "" {
 		cfg.Storage.FileName = "data_dump"
 	}
+	// default deleteAfterDownload to false if unset
+	// (go's zero value for bool is false, so no action needed)
 }
 
 /*
@@ -187,13 +193,16 @@ func (cfg *Config) OverrideConfig(o ConfigOverride) {
 				cfg.API.Auth.ClientID = *o.API.Auth.ClientID
 			}
 			if o.API.Auth.ClientSecret != nil {
-				cfg.API.Auth.ClientSecret = *o.API.Auth.ClientSecret
+				cfg.API.Auth.ClientSecret = *o.
+					API.Auth.ClientSecret
 			}
 			if o.API.Auth.ApplicationID != nil {
-				cfg.API.Auth.ApplicationID = *o.API.Auth.ApplicationID
+				cfg.API.Auth.ApplicationID = *o.
+					API.Auth.ApplicationID
 			}
 			if o.API.Auth.RefreshToken != nil {
-				cfg.API.Auth.RefreshToken = *o.API.Auth.RefreshToken
+				cfg.API.Auth.RefreshToken = *o.
+					API.Auth.RefreshToken
 			}
 		}
 		if o.API.BaseURL != nil {
@@ -230,6 +239,10 @@ func (cfg *Config) OverrideConfig(o ConfigOverride) {
 		}
 		if o.EDI.SenderID != nil {
 			cfg.EDI.SenderID = *o.EDI.SenderID
+		}
+		if o.EDI.DeleteAfterDownload != nil {
+			cfg.EDI.DeleteAfterDownload = *o.
+				EDI.DeleteAfterDownload
 		}
 	}
 	if o.Storage != nil {

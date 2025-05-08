@@ -21,7 +21,8 @@
 		"privateKeyPath": "/path/to/your/ssh_private_key",
 		"inboundDir": "/download",
 		"outboundDir": "/upload",
-		"senderId": "<YOUR_SENDER_ID>"
+		"senderId": "<YOUR_SENDER_ID>",
+		"deleteAfterDownload": false
 	},
 	"storage": {
 		"outputFormat": "json",
